@@ -93,6 +93,11 @@ RUN pip3 --disable-pip-version-check --no-cache-dir install --upgrade --pre pyli
 # See also: https://github.com/acsone/bobtemplates.odoo
 RUN pip3 --disable-pip-version-check --no-cache-dir install --upgrade bobtemplates.odoo
 
+# Install OCA server-auth (auth_api_key)
+USER vscode
+RUN git clone --branch=${ODOO_VERSION} --depth=1 https://github.com/OCA/server-auth.git oca/server-auth
+USER root
+
 # Create directories and set permissions
 RUN mkdir /opt/odoo/.vscode /opt/odoo/custom_addons /opt/odoo/data /opt/odoo/scripts /opt/odoo/templates \
     && chown vscode:vscode /opt/odoo/.vscode /opt/odoo/custom_addons /opt/odoo/data /opt/odoo/scripts /opt/odoo/templates

@@ -1,0 +1,8 @@
+{
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/repos/odoo"
+    ],
+    "git.ignoredRepositories": [
+        "${workspaceFolder}/repos"
+    ]
+}
