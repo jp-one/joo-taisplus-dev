@@ -38,7 +38,7 @@ class ApiController(http.Controller):
     @http.route(
         "/taisplus/api/tais/<string:tais_code>",
         type="http",
-        auth="public",
+        auth="api_key",
         methods=["GET"],
         csrf=False,
     )
@@ -47,7 +47,6 @@ class ApiController(http.Controller):
         taisCodeService: TaisService = request.env[
             "taisplus.tais.service"
         ]
-        taisCodeService = taisCodeService.sudo()    # public access
 
         # Validate the TAIS code parameter
         is_valid, validation_result = self._validate_tais_code(tais_code)
@@ -97,7 +96,7 @@ class ApiController(http.Controller):
     @http.route(
         "/taisplus/api/pricecap/<string:tais_code>/<string:target_date>",
         type="http",
-        auth="public",
+        auth="api_key",
         methods=["GET"],
         csrf=False,
     )
@@ -106,7 +105,6 @@ class ApiController(http.Controller):
         priceListService: PriceListService = request.env[
             "taisplus.pricelist.service"
         ]
-        priceListService = priceListService.sudo()  # public access
 
         # Validate the TAIS code and target date parameters
         is_valid, validation_result = self._validate_tais_code(tais_code)

@@ -25,6 +25,7 @@
     "depends": [
         "base",
         "product",
+        "auth_api_key",  # https://github.com/OCA/server-auth
     ],
     "external_dependencies": {
         "python": ["openpyxl"],

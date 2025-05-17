@@ -3,6 +3,6 @@
         "${workspaceFolder}/repos/odoo"
     ],
     "git.ignoredRepositories": [
-        "${workspaceFolder}/repos"
+        "${workspaceFolder}/repos/odoo"
     ]
 }

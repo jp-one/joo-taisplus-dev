@@ -3,7 +3,7 @@
     "name": "福祉用具(TAIS+)",
     "version": "16.0.1.0.0",
     "author": "jp-one",
-    "license": "AGPL-3",    # https://github.com/OCA/server-auth
+    "license": "LGPL-3",
     "maintainer": "jp-one",
     "website": "https://github.com/jp-one/joo-taisplus",
     "summary": """

@@ -38,7 +38,7 @@ class PriceListService(models.AbstractModel):
             return target
         if target == None:
             return future
-        if target.pricecap > future.pricecap:
+        if target.price_cap > future.price_cap:
             return future
         return target
 
