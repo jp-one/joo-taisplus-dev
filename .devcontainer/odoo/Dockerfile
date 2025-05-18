@@ -36,10 +36,10 @@ RUN if ! cat /etc/group | grep -e "^pip-global:" > /dev/null 2>&1; then groupadd
 RUN mkdir /opt/odoo && chown -R vscode:vscode /opt/odoo
 RUN mkdir /opt/odoo/repos && chown -R vscode:vscode /opt/odoo/repos
 
-ENV PYTHONPATH=/opt/odoo/repos:${PYTHONPATH}
 WORKDIR /opt/odoo/repos
 
 # Install Odoo
+ENV PYTHONPATH=/opt/odoo/repos/odoo:${PYTHONPATH}
 USER vscode
 ARG ODOO_VERSION="master"
 RUN git clone --branch=${ODOO_VERSION} --depth=1 https://github.com/odoo/odoo.git odoo
@@ -94,6 +94,7 @@ RUN pip3 --disable-pip-version-check --no-cache-dir install --upgrade --pre pyli
 RUN pip3 --disable-pip-version-check --no-cache-dir install --upgrade bobtemplates.odoo
 
 # Install OCA server-auth (auth_api_key)
+ENV PYTHONPATH=/opt/odoo/repos/oca/server-auth:${PYTHONPATH}
 USER vscode
 RUN git clone --branch=${ODOO_VERSION} --depth=1 https://github.com/OCA/server-auth.git oca/server-auth
 USER root
