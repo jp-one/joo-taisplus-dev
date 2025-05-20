@@ -5,10 +5,6 @@ class Ccta95(models.Model):
     _name = "taisplus.ccta95"
     _description = "分類コード(CCTA95)"
 
-    _sql_constraints = [
-        ("ccta95_code", "UNIQUE(ccta95_code)", "The ccta95_code must be unique!")
-    ]
-
     hierarchy_level = fields.Selection(
         [("major", "大分類"), ("middle", "中分類"), ("minor", "小分類")],
         string="分類階層",
@@ -28,12 +24,9 @@ class Ccta95(models.Model):
         help="分類コードに(*)が付与されている分類項目です。",
     )
 
+    _sql_constraints = [
+        ("ccta95_code", "UNIQUE(ccta95_code)", "The ccta95_code must be unique!"),
+    ]
+
     def name_get(self):
-        """
-        オーバーライドして参照時に "[分類コード] 分類項目" の形式を表示
-        """
-        result = []
-        for record in self:
-            display_name = f"[{record.ccta95_code}] {record.name}"
-            result.append((record.id, display_name))
-        return result
+        return [(record.id, f"[{record.ccta95_code}] {record.name}") for record in self]

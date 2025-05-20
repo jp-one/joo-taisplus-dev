@@ -1,5 +1,7 @@
 from odoo import models, fields, api
 from .tais_service import TaisService
+from .tais import Tais
+from .ccta95 import Ccta95
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -10,19 +12,22 @@ class TaisImport(models.TransientModel):
     _description = "Import TAIS Codes"
 
     tais_codes = fields.Text(
-        string="TAISコード(複数可)", required=True, help="複数のTAISコードを改行で区切って入力してください"
+        string="TAISコード(複数可)",
+        required=True,
+        help="複数のTAISコードを改行で区切って入力してください",
     )
 
     @api.model
     def fetch_tais_data(self, tais_code):
-        taisCodeService: TaisService = self.env["taisplus.tais.service"]
+        tais_service_model = self.env["taisplus.tais.service"]  # type: TaisService
         parts = tais_code.split("-")
-        tais_url = taisCodeService.generate_tais_url(parts[0], parts[1])
-        taisCode = taisCodeService.fetch_tais_product_details(tais_url)
-        return taisCode
+        tais_url = tais_service_model.generate_tais_url(parts[0], parts[1])
+        return tais_service_model.fetch_tais_product_details(tais_url)
 
     def import_tais_codes(self):
         """Import TAIS codes from the entered text."""
+        tais_model = self.env["taisplus.tais"].sudo()  # type: Tais
+
         if not self.tais_codes:
             raise ValueError("No TAIS codes provided.")
 
@@ -30,71 +35,34 @@ class TaisImport(models.TransientModel):
             code.strip() for code in self.tais_codes.splitlines() if code.strip()
         ]
 
-        taisCode = self.env["taisplus.tais"]
-        taisCode = taisCode.sudo()
-
         for tais_code in tais_code_list:
             try:
-                # Fetch data from the API
                 data = self.fetch_tais_data(tais_code)
-
                 # ccta95_id
                 ccta95 = self.env["taisplus.ccta95"].search(
-                    [("ccta95_code", "=", data.get("ccta95_code", ""))], limit=1
-                )
-                if ccta95:
-                    data["ccta95_id"] = ccta95.id
+                    [("ccta95_code", "=", data.ccta95_code)], limit=1
+                )  # type: Ccta95
+                record_vals = {
+                    "name": data.product_name,
+                    "tais_code": tais_code,
+                    "ccta95_id": ccta95.id if ccta95 else None,
+                    "model_number": data.model_number,
+                    "manufacturer": data.manufacturer,
+                    "rental_service": "R" + data.rental_service_code,
+                    "sales_service": "S" + data.sales_service_code,
+                    "image_url": data.image_url,
+                    "product_summary": data.product_summary,
+                    "is_discontinued": data.is_discontinued,
+                    "tais_url": data.tais_url,
+                }
+                filtered_vals = {k: v for k, v in record_vals.items() if v is not None}
 
-                # rental_service
-                data["rental_service"] = "R" + data.get("rental_service_code")
-                # sales_service
-                data["sales_service"] = "S" + data.get("sales_service_code")
-
-                # Upsert
-                existing_record = taisCode.search(
+                existing_record = tais_model.search(
                     [("tais_code", "=", tais_code)], limit=1
                 )
                 if existing_record:
-                    new_data = {
-                        "name": data.get("product_name"),
-                        "tais_code": tais_code,
-                        "ccta95_id": data.get("ccta95_id"),
-                        "model_number": data.get("model_number"),
-                        "manufacturer": data.get("manufacturer"),
-                        "rental_service": data.get("rental_service"),
-                        "sales_service": data.get("sales_service"),
-                        "image_url": data.get("image_url"),
-                        "product_summary": data.get("product_summary"),
-                        "is_discontinued": data.get("is_discontinued"),
-                        "tais_url": data.get("tais_url"),
-                    }
-                    existing_record.write(
-                        {
-                            key: value
-                            for key, value in new_data.items()
-                            if value is not None
-                        }
-                    )
+                    existing_record.write(filtered_vals)
                 else:
-                    new_data = {
-                        "name": data.get("product_name"),
-                        "tais_code": tais_code,
-                        "ccta95_id": data.get("ccta95_id"),
-                        "model_number": data.get("model_number"),
-                        "manufacturer": data.get("manufacturer"),
-                        "rental_service": data.get("rental_service"),
-                        "sales_service": data.get("sales_service"),
-                        "image_url": data.get("image_url"),
-                        "product_summary": data.get("product_summary"),
-                        "is_discontinued": data.get("is_discontinued"),
-                        "tais_url": data.get("tais_url"),
-                    }
-                    taisCode.create(
-                        {
-                            key: value
-                            for key, value in new_data.items()
-                            if value is not None
-                        }
-                    )
+                    tais_model.create(filtered_vals)
             except Exception as e:
                 _logger.error(f"Error importing TAIS code {tais_code}: {e}")

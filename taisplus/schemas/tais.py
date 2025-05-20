@@ -1,7 +1,8 @@
-from typing import TypedDict
+from dataclasses import dataclass
 
 
-class TaisDict(TypedDict):
+@dataclass
+class TaisData:
     tais_code: str
     tais_url: str
     ccta95_code: str

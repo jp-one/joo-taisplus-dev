@@ -13,41 +13,33 @@ class PriceListImport(models.TransientModel):
     filename = fields.Char(string="Filename")
 
     def import_pricelist(self):
+        pricelist_model = self.env["taisplus.pricelist"].sudo()
+        item_model = self.env["taisplus.pricelist.item"].sudo()
 
         # Validate filename format
-        if not self.filename.lower().startswith("pricelist"):
+        filename = self.filename or ""
+        if not filename.lower().startswith("pricelist"):
             raise ValueError("Filename must start with 'pricelist'.")
-        if not self.filename.lower().endswith(".xlsx"):
+        if not filename.lower().endswith(".xlsx"):
             raise ValueError("Filename must have an extension of .xlsx.")
-        header_filename = self.filename
 
-        # Extract date from the filename
+        # Extract date and expected headers
         try:
-            if "_" in self.filename:
-                # Format: pricelist_YYYY-MM-DD_○○.xlsx
-                date_str = self.filename.split("_")[1]  # Extract 'YYYY-MM-DD'
+            if "_" in filename:
+                # pricelist_YYYY-MM-DD_○○.xlsx
+                date_str = filename.split("_")[1]
                 header_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-                # Validate the sheet by searching for the header row
                 expected_headers = [
-                    "商品コード",
-                    "法人名",
-                    "商品名",
-                    "型番",
-                    "全国平均貸与価格（円）",
-                    "貸与価格の上限（円）",
+                    "商品コード", "法人名", "商品名", "型番",
+                    "全国平均貸与価格（円）", "貸与価格の上限（円）"
                 ]
             else:
-                # Format: pricelistYYYYMM.xlsx
-                date_str = self.filename[9:15]  # Extract 'YYYYMM'
+                # pricelistYYYYMM.xlsx
+                date_str = filename[9:15]
                 header_date = datetime.strptime(date_str, "%Y%m").replace(day=1).date()
-                # Validate the sheet by searching for the header row
                 expected_headers = [
-                    "コード",
-                    "法人名",
-                    "商品名",
-                    "型番",
-                    "全国平均貸与価格（円）",
-                    "貸与価格の上限（円）",
+                    "コード", "法人名", "商品名", "型番",
+                    "全国平均貸与価格（円）", "貸与価格の上限（円）"
                 ]
         except (IndexError, ValueError):
             raise ValueError(
@@ -55,108 +47,77 @@ class PriceListImport(models.TransientModel):
                 "(e.g., 'pricelist_2025-04-01_<remarks>.xlsx' or 'pricelist202504.xlsx')."
             )
 
-        # Create header name
         header_name = f"上限一覧 {header_date.strftime('%Y-%m-%d')}"
-
-        # Decode the file content
         file_content = base64.b64decode(self.file)
-        # Load the workbook (XLSX only)
         workbook = openpyxl.load_workbook(BytesIO(file_content))
+        sheet_names = ", ".join(sheet.title for sheet in workbook.worksheets)
+        num_columns = len(expected_headers)
 
-        header_sheetname = ", ".join([sheet.title for sheet in workbook.worksheets])
-
-        num_columns = len(expected_headers)  # Determine the number of columns
-
-        # Process all sheets in the workbook
         temp_data = []
         titles = []
         for sheet in workbook.worksheets:
             header_row = None
-            for row_idx in range(1, 7):  # Search within the first 6 rows
+            for row_idx in range(1, 7):
                 actual_headers = [
                     sheet.cell(row=row_idx, column=col).value
                     for col in range(1, num_columns + 1)
                 ]
-                
                 if actual_headers == expected_headers:
                     header_row = row_idx
                     break
-                else:
-                    titles.append(actual_headers)
-
+                titles.append(actual_headers)
             if header_row is None:
                 raise ValueError(
-                    f"Valid headers not found in sheet '{self.filename}!{sheet.title}'. Expected: {expected_headers}"
+                    f"Valid headers not found in sheet '{filename!r}!{sheet.title}'. Expected: {expected_headers}"
                 )
-
-            # Load data starting from the row after the header
             for row in sheet.iter_rows(
-                min_row=header_row + 1,
-                max_row=sheet.max_row,
-                min_col=1,
-                max_col=num_columns,
+                min_row=header_row + 1, max_row=sheet.max_row,
+                min_col=1, max_col=num_columns
             ):
-                if row[0].value is None:  # Exit loop if tais_code is None
+                if row[0].value is None:
                     break
-                temp_data.append(
-                    {
-                        "tais_code": row[0].value,  # 商品コード
-                        "manufacturer": row[1].value,  # 法人名
-                        "product_name": row[2].value,  # 商品名
-                        "model_number": row[3].value,  # 型番
-                        "average_price": row[4].value,  # 全国平均貸与価格（円）
-                        "price_cap": row[5].value,  # 貸与価格の上限（円）
-                    }
-                )
+                temp_data.append({
+                    "tais_code": row[0].value,
+                    "manufacturer": row[1].value,
+                    "product_name": row[2].value,
+                    "model_number": row[3].value,
+                    "average_price": row[4].value,
+                    "price_cap": row[5].value,
+                })
 
         notes = "\n".join(
             " ".join(str(cell) for cell in row if cell) for row in titles if any(row)
         )
 
-        # model for price_list and price_list_item
-        price_list = self.env["taisplus.pricelist"]
-        price_list_item = self.env["taisplus.pricelist.item"]
-        price_list = price_list.sudo()
-        price_list_item = price_list_item.sudo()
-        
-        # Determine or create the price_list record
-        header_rec = price_list.search([("tais_code_date", "=", header_date)], limit=1)
+        header_rec = pricelist_model.search([("tais_code_date", "=", header_date)], limit=1)
         if not header_rec:
-            header_rec = price_list.create(
-                {
-                    "name": header_name,
-                    "tais_code_date": header_date,
-                    "filename": header_filename,
-                    "sheetname": header_sheetname,
-                    "notes": notes,
-                }
-            )
+            header_rec = pricelist_model.create({
+                "name": header_name,
+                "tais_code_date": header_date,
+                "filename": filename,
+                "sheetname": sheet_names,
+                "notes": notes,
+            })
         else:
-            # Update existing header
             header_rec.name = header_name
-            header_rec.filename = header_filename
-            header_rec.sheetname = header_sheetname
+            header_rec.filename = filename
+            header_rec.sheetname = sheet_names
             header_rec.notes = notes
-            # Delete existing price_list_item records
             header_rec.item_ids.unlink()
 
-        # Perform intermediate processing and add records to price_list_item
         date_str = header_date.strftime("%Y-%m-%d")
         for item in temp_data:
-            price_list_item.create(
-                {
-                    "name": item["tais_code"] + ":" + date_str,
-                    "tais_code": item["tais_code"],
-                    "manufacturer": item["manufacturer"],
-                    "product_name": item["product_name"],
-                    "model_number": item["model_number"],
-                    "average_price": item["average_price"],
-                    "price_cap": item["price_cap"],
-                    "pricelist_id": header_rec.id,
-                }
-            )
+            item_model.create({
+                "name": f"{item['tais_code']}:{date_str}",
+                "tais_code": item["tais_code"],
+                "manufacturer": item["manufacturer"],
+                "product_name": item["product_name"],
+                "model_number": item["model_number"],
+                "average_price": item["average_price"],
+                "price_cap": item["price_cap"],
+                "pricelist_id": header_rec.id,
+            })
 
-        # Open the form view of the created/updated header record
         return {
             "type": "ir.actions.act_window",
             "res_model": "taisplus.pricelist",

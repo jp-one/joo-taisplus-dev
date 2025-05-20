@@ -3,6 +3,7 @@ from odoo.http import request
 from typing import Tuple, TypedDict, Union
 import json
 from datetime import datetime, date
+from dataclasses import asdict
 from ..models import TaisService, PriceListService
 
 
@@ -21,7 +22,7 @@ class ApiController(http.Controller):
 
     def _validate_tais_code(
         self, tais_code: str
-    ) -> Tuple[bool, Union[list[str], ErrorResponse]]:
+    ) -> Tuple[bool, Union[list[str], "ApiController.ErrorResponse"]]:
         if not tais_code:
             return False, ApiController.ErrorResponse(
                 error="TAIS code is required.",
@@ -44,9 +45,9 @@ class ApiController(http.Controller):
     )
     def get_tais_code(self, tais_code, **kwargs):
 
-        taisCodeService: TaisService = request.env[
+        tais_code_service_model = request.env[
             "taisplus.tais.service"
-        ]
+        ]  # type: TaisService
 
         # Validate the TAIS code parameter
         is_valid, validation_result = self._validate_tais_code(tais_code)
@@ -54,16 +55,15 @@ class ApiController(http.Controller):
             return request.make_response(
                 json.dumps(validation_result),
                 headers=[("Content-Type", "application/json")],
-                status=400, # 400 Bad Request
+                status=400,  # 400 Bad Request
             )
 
-        # Fetch data from TAIS
-        tais_url = taisCodeService.generate_tais_url(
+        tais_url = tais_code_service_model.generate_tais_url(
             validation_result[0], validation_result[1]
         )
         try:
-            taisCode = taisCodeService.fetch_tais_product_details(tais_url)
-        except Exception as e:
+            taisData = tais_code_service_model.fetch_tais_product_details(tais_url)
+        except Exception:
             return request.make_response(
                 json.dumps(
                     ApiController.ErrorResponse(
@@ -72,11 +72,11 @@ class ApiController(http.Controller):
                     )
                 ),
                 headers=[("Content-Type", "application/json")],
-                status=404, # 404 Not Found
+                status=404,  # 404 Not Found
             )
 
         # Validate the extracted TAIS code
-        if taisCode.get("tais_code") != tais_code:
+        if taisData.tais_code != tais_code:
             return request.make_response(
                 json.dumps(
                     ApiController.ErrorResponse(
@@ -85,11 +85,11 @@ class ApiController(http.Controller):
                     )
                 ),
                 headers=[("Content-Type", "application/json")],
-                status=404, # 404 Not Found
+                status=404,  # 404 Not Found
             )
 
         return request.make_response(
-            json.dumps(taisCode),
+            json.dumps(asdict(taisData)),
             headers=[("Content-Type", "application/json")],
         )
 
@@ -102,9 +102,9 @@ class ApiController(http.Controller):
     )
     def get_pricecap(self, tais_code, target_date, **kwargs):
 
-        priceListService: PriceListService = request.env[
+        price_list_service_model = request.env[
             "taisplus.pricelist.service"
-        ]
+        ]  # type: PriceListService
 
         # Validate the TAIS code and target date parameters
         is_valid, validation_result = self._validate_tais_code(tais_code)
@@ -129,8 +129,10 @@ class ApiController(http.Controller):
                 status=400,
             )
 
-        taisPriceCap = priceListService.get_tais_price_cap(tais_code, target_date)
+        taisPriceCapData = price_list_service_model.get_tais_price_cap(
+            tais_code, target_date
+        )
         return request.make_response(
-            json.dumps(taisPriceCap, default=date_serializer),
+            json.dumps(asdict(taisPriceCapData), default=date_serializer),
             headers=[("Content-Type", "application/json")],
         )

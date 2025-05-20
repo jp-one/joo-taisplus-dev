@@ -2,7 +2,7 @@ import re
 from bs4 import BeautifulSoup
 import requests
 from odoo import models
-from ..schemas.tais import TaisDict
+from ..schemas.tais import TaisData
 
 
 class TaisService(models.AbstractModel):
@@ -165,7 +165,7 @@ class TaisService(models.AbstractModel):
         discontinued_tag = div_right.find("p", string="生産終了")
         is_discontinued = discontinued_tag is not None
 
-        return TaisDict(
+        return TaisData(
             tais_code=tais_code,
             tais_url=tais_url,
             ccta95_code=ccta95_code,

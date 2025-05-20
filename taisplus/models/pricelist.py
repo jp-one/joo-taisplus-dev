@@ -6,10 +6,13 @@ class PriceList(models.Model):
     _description = "TAIS Code Price List (header)"
 
     name = fields.Char(
-        string="貸与価格のリスト名", required=True
+        string="貸与価格のリスト名",
+        required=True,
     )
-
-    tais_code_date = fields.Date(string="適用開始日", required=True)
+    tais_code_date = fields.Date(
+        string="適用開始日",
+        required=True,
+    )
     filename = fields.Char(string="ファイル名")
     sheetname = fields.Char(string="シート名")
     notes = fields.Text(string="補足説明")

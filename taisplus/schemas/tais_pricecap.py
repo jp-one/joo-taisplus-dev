@@ -1,8 +1,9 @@
 from datetime import date
-from typing import TypedDict
+from dataclasses import dataclass
 
 
-class TaisPriceCapItemDict(TypedDict):
+@dataclass
+class TaisPriceCapItemData:
     name: str
     date: date
     average_price: float
@@ -10,8 +11,9 @@ class TaisPriceCapItemDict(TypedDict):
     currency: str
 
 
-class TaisPriceCapDict(TypedDict):
+@dataclass
+class TaisPriceCapData:
     tais_code: str
     target_date: date
-    target: TaisPriceCapItemDict
-    future: TaisPriceCapItemDict
+    target: TaisPriceCapItemData
+    future: TaisPriceCapItemData

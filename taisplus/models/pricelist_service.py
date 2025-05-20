@@ -1,8 +1,8 @@
 from odoo import models
 from datetime import date
-
+from typing import Optional
+from ..schemas.tais_pricecap import TaisPriceCapData, TaisPriceCapItemData
 from .pricelist_item import PriceListItem
-from ..schemas.tais_pricecap import TaisPriceCapDict, TaisPriceCapItemDict
 
 
 class PriceListService(models.AbstractModel):
@@ -13,71 +13,51 @@ class PriceListService(models.AbstractModel):
         self,
         tais_code: str,
         target_date: date,
-    ) -> TaisPriceCapDict:
-
-        # Fetch target and previous records
-        target = self._get_tais_price_cap_target(tais_code, target_date)
-
-        # Determine target or minimum
-        future = self._get_tais_price_cap_target_or_future(
-            target, tais_code, target_date
-        )
-
-        return TaisPriceCapDict(
-            tais_code=tais_code if tais_code else None,
+    ) -> TaisPriceCapData:
+        target = self._get_tais_price_cap_item(tais_code, target_date, is_future=False)
+        future = self._get_tais_price_cap_item(tais_code, target_date, is_future=True)
+        selected = self._select_target_or_future(target, future)
+        return TaisPriceCapData(
+            tais_code=tais_code or None,
             target_date=target_date,
             target=target,
-            future=future,
+            future=selected,
         )
 
-    def _get_tais_price_cap_target_or_future(
-        self, target: TaisPriceCapItemDict | None, tais_code: str, target_date: date
-    ):
-        future = self._get_tais_price_cap_future(tais_code, target_date)
-        if future == None:
-            return target
-        if target == None:
-            return future
-        if target.price_cap > future.price_cap:
-            return future
-        return target
-
-    def _get_tais_price_cap_future(self, tais_code: str, target_date: date):
-        priceListItem: PriceListItem = self.env["taisplus.pricelist.item"]
-        record = priceListItem.search(
-            [("tais_code", "=", tais_code), ("tais_code_date", ">", target_date)],
-            order="price_cap asc",
-            limit=1,
-        )
-        future = None
-        if record:
-            future = TaisPriceCapItemDict(
-                name=record.pricelist_id.name,
-                date=record.tais_code_date,
-                average_price=record.average_price,
-                price_cap=record.price_cap,
-                currency=record.currency_id.name,
-            )
-        return future
-
-    def _get_tais_price_cap_target(
+    def _get_tais_price_cap_item(
         self,
         tais_code: str,
         target_date: date,
-    ):
-        priceListItem: PriceListItem = self.env["taisplus.pricelist.item"]
-        record = priceListItem.search(
-            [("tais_code", "=", tais_code), ("tais_code_date", "<=", target_date)],
-            order="tais_code_date desc",
-            limit=1,
+        is_future: bool = False,
+    ) -> Optional[TaisPriceCapItemData]:
+        priceListItem = self.env["taisplus.pricelist.item"]  # type: PriceListItem
+        domain = [
+            ("tais_code", "=", tais_code),
+            (
+                ("tais_code_date", ">", target_date)
+                if is_future
+                else ("tais_code_date", "<=", target_date)
+            ),
+        ]
+        order = "price_cap asc" if is_future else "tais_code_date desc"
+        record = priceListItem.search(domain, order=order, limit=1)
+        if not record:
+            return None
+        return TaisPriceCapItemData(
+            name=record.pricelist_id.name,
+            date=record.tais_code_date,
+            average_price=record.average_price,
+            price_cap=record.price_cap,
+            currency=record.currency_id.name,
         )
-        target = None
-        if record:
-            target = TaisPriceCapItemDict(
-                name=record.pricelist_id.name,
-                date=record.tais_code_date,
-                average_price=record.average_price,
-                price_cap=record.price_cap,
-                currency=record.currency_id.name,
-            )
-        return target
+
+    def _select_target_or_future(
+        self,
+        target: Optional[TaisPriceCapItemData],
+        future: Optional[TaisPriceCapItemData],
+    ) -> Optional[TaisPriceCapItemData]:
+        if not future:
+            return target
+        if not target:
+            return future
+        return future if target.price_cap > future.price_cap else target
