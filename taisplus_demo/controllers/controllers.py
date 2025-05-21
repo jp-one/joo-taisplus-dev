@@ -7,6 +7,7 @@ from datetime import datetime, date
 from pytz import utc
 from ..models import ProductService
 
+
 def date_serializer(obj):
     """Custom serializer for date objects."""
     if isinstance(obj, date):
@@ -30,7 +31,7 @@ class ApiController(http.Controller):
     def get_product(self, default_code, target_datetime, **kwargs):
 
         product_service: ProductService = request.env["product_tais.product.service"]
-        
+
         try:
             # target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
             target_date = datetime.fromisoformat(target_datetime).date()
