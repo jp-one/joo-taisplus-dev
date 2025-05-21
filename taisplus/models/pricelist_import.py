@@ -30,16 +30,24 @@ class PriceListImport(models.TransientModel):
                 date_str = filename.split("_")[1]
                 header_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 expected_headers = [
-                    "商品コード", "法人名", "商品名", "型番",
-                    "全国平均貸与価格（円）", "貸与価格の上限（円）"
+                    "商品コード",
+                    "法人名",
+                    "商品名",
+                    "型番",
+                    "全国平均貸与価格（円）",
+                    "貸与価格の上限（円）",
                 ]
             else:
                 # pricelistYYYYMM.xlsx
                 date_str = filename[9:15]
                 header_date = datetime.strptime(date_str, "%Y%m").replace(day=1).date()
                 expected_headers = [
-                    "コード", "法人名", "商品名", "型番",
-                    "全国平均貸与価格（円）", "貸与価格の上限（円）"
+                    "コード",
+                    "法人名",
+                    "商品名",
+                    "型番",
+                    "全国平均貸与価格（円）",
+                    "貸与価格の上限（円）",
                 ]
         except (IndexError, ValueError):
             raise ValueError(
@@ -47,12 +55,10 @@ class PriceListImport(models.TransientModel):
                 "(e.g., 'pricelist_2025-04-01_<remarks>.xlsx' or 'pricelist202504.xlsx')."
             )
 
-        header_name = f"上限一覧 {header_date.strftime('%Y-%m-%d')}"
         file_content = base64.b64decode(self.file)
         workbook = openpyxl.load_workbook(BytesIO(file_content))
         sheet_names = ", ".join(sheet.title for sheet in workbook.worksheets)
         num_columns = len(expected_headers)
-
         temp_data = []
         titles = []
         for sheet in workbook.worksheets:
@@ -71,33 +77,42 @@ class PriceListImport(models.TransientModel):
                     f"Valid headers not found in sheet '{filename!r}!{sheet.title}'. Expected: {expected_headers}"
                 )
             for row in sheet.iter_rows(
-                min_row=header_row + 1, max_row=sheet.max_row,
-                min_col=1, max_col=num_columns
+                min_row=header_row + 1,
+                max_row=sheet.max_row,
+                min_col=1,
+                max_col=num_columns,
             ):
                 if row[0].value is None:
                     break
-                temp_data.append({
-                    "tais_code": row[0].value,
-                    "manufacturer": row[1].value,
-                    "product_name": row[2].value,
-                    "model_number": row[3].value,
-                    "average_price": row[4].value,
-                    "price_cap": row[5].value,
-                })
+                temp_data.append(
+                    {
+                        "tais_code": row[0].value,
+                        "manufacturer": row[1].value,
+                        "product_name": row[2].value,
+                        "model_number": row[3].value,
+                        "average_price": row[4].value,
+                        "price_cap": row[5].value,
+                    }
+                )
 
         notes = "\n".join(
             " ".join(str(cell) for cell in row if cell) for row in titles if any(row)
         )
 
-        header_rec = pricelist_model.search([("tais_code_date", "=", header_date)], limit=1)
+        header_name = f"上限一覧 {header_date.strftime('%Y-%m-%d')}"
+        header_rec = pricelist_model.search(
+            [("tais_code_date", "=", header_date)], limit=1
+        )
         if not header_rec:
-            header_rec = pricelist_model.create({
-                "name": header_name,
-                "tais_code_date": header_date,
-                "filename": filename,
-                "sheetname": sheet_names,
-                "notes": notes,
-            })
+            header_rec = pricelist_model.create(
+                {
+                    "name": header_name,
+                    "tais_code_date": header_date,
+                    "filename": filename,
+                    "sheetname": sheet_names,
+                    "notes": notes,
+                }
+            )
         else:
             header_rec.name = header_name
             header_rec.filename = filename
@@ -107,16 +122,18 @@ class PriceListImport(models.TransientModel):
 
         date_str = header_date.strftime("%Y-%m-%d")
         for item in temp_data:
-            item_model.create({
-                "name": f"{item['tais_code']}:{date_str}",
-                "tais_code": item["tais_code"],
-                "manufacturer": item["manufacturer"],
-                "product_name": item["product_name"],
-                "model_number": item["model_number"],
-                "average_price": item["average_price"],
-                "price_cap": item["price_cap"],
-                "pricelist_id": header_rec.id,
-            })
+            item_model.create(
+                {
+                    "name": f"{item['tais_code']}:{date_str}",
+                    "tais_code": item["tais_code"],
+                    "manufacturer": item["manufacturer"],
+                    "product_name": item["product_name"],
+                    "model_number": item["model_number"],
+                    "average_price": item["average_price"],
+                    "price_cap": item["price_cap"],
+                    "pricelist_id": header_rec.id,
+                }
+            )
 
         return {
             "type": "ir.actions.act_window",
