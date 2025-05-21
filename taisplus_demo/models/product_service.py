@@ -1,6 +1,7 @@
 from odoo import models
 from datetime import date, datetime
-from ..schemas import AidPriceData, AidProductData
+from ..schemas import AidPriceData, AidVenderPriceData, AidProductData
+
 # from taisplus.models.pricelist_item import PriceListItem
 # from taisplus.models.pricelist_service import PriceListService
 # from addons.product.models.product_supplierinfo import SupplierInfo
@@ -34,19 +35,24 @@ class ProductService(models.AbstractModel):
         pricelist_item = product_pricelist_item_model.env.cr.fetchone()
         if pricelist_item:
             pricelist_item = product_pricelist_item_model.browse(pricelist_item[0])
-            sales_price = pricelist_item.fixed_price
-            sales_currency = pricelist_item.currency_id.name
-            sales_date_start = pricelist_item.date_start
-        else:
-            sales_price = None
-            sales_currency = None
-            sales_date_start = None
+            return AidPriceData(
+                target_datetime=target_datetime,
+                price=(
+                    pricelist_item.fixed_price if pricelist_item.fixed_price else None
+                ),
+                currency=pricelist_item.currency_id.name,
+                date_start=(
+                    pricelist_item.date_start if pricelist_item.date_start else None
+                ),
+                date_end=pricelist_item.date_end if pricelist_item.date_end else None,
+            )
 
         return AidPriceData(
-            price=sales_price,
-            currency=sales_currency,
-            date_start=sales_date_start,
             target_datetime=target_datetime,
+            price=None,
+            currency=None,
+            date_start=None,
+            date_end=None,
         )
 
     def _get_purchase_price(self, product_tmpl_id, product_id, target_date):
@@ -72,20 +78,37 @@ class ProductService(models.AbstractModel):
         product_supplierinfo_model.env.cr.execute(query, params)
         supplierinfo = product_supplierinfo_model.env.cr.fetchone()
         if supplierinfo:
-            supplierinfo = product_supplierinfo_model.browse(supplierinfo[0]) # type: SupplierInfo
-            purchase_price = supplierinfo.price
-            purchase_currency = supplierinfo.currency_id.name
-            purchase_date_start = supplierinfo.date_start
-        else:
-            purchase_price = None
-            purchase_currency = None
-            purchase_date_start = None
+            supplierinfo = product_supplierinfo_model.browse(
+                supplierinfo[0]
+            )  # type: SupplierInfo
+            return AidVenderPriceData(
+                target_datetime=target_date,
+                date_start=supplierinfo.date_start if supplierinfo.date_start else None,
+                date_end=supplierinfo.date_end if supplierinfo.date_end else None,
+                price=supplierinfo.price,
+                currency=supplierinfo.currency_id.name,
+                vendor_name=(
+                    supplierinfo.partner_id.name
+                    if supplierinfo.partner_id.name
+                    else None
+                ),
+                vendor_product_code=(
+                    supplierinfo.product_code if supplierinfo.product_code else None
+                ),
+                vendor_product_name=(
+                    supplierinfo.product_name if supplierinfo.product_name else None
+                ),
+            )
 
-        return AidPriceData(
-            price=purchase_price,
-            currency=purchase_currency,
-            date_start=purchase_date_start,
+        return AidVenderPriceData(
             target_datetime=target_date,
+            price=None,
+            currency=None,
+            date_start=None,
+            date_end=None,
+            vendor_name=None,
+            vendor_product_code=None,
+            vendor_product_name=None,
         )
 
     def _get_tais_price_cap(self, tais_code, target_date):
