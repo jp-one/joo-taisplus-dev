@@ -1,14 +1,11 @@
-from typing import Tuple, TypedDict, Union
-
-from pytz import utc
 from odoo import http
 from odoo.http import request
+from typing import TypedDict
 import json
+from dataclasses import asdict
 from datetime import datetime, date
+from pytz import utc
 from ..models import ProductService
-
-from odoo import http
-from odoo.http import request
 
 def date_serializer(obj):
     """Custom serializer for date objects."""
@@ -68,7 +65,7 @@ class ApiController(http.Controller):
             )
 
         return request.make_response(
-            json.dumps(tais_product, default=date_serializer),
+            json.dumps(asdict(tais_product), default=date_serializer),
             headers=[("Content-Type", "application/json")],
             status=200,
         )

@@ -1,6 +1,9 @@
 from odoo import models
 from datetime import date, datetime
-from ..schemas import AidPriceDict, AidProductDict
+from ..schemas import AidPriceData, AidProductData
+# from taisplus.models.pricelist_item import PriceListItem
+# from taisplus.models.pricelist_service import PriceListService
+# from addons.product.models.product_supplierinfo import SupplierInfo
 
 
 class ProductService(models.AbstractModel):
@@ -9,7 +12,9 @@ class ProductService(models.AbstractModel):
 
     def _get_sales_price(self, product_tmpl_id, product_id, target_datetime):
 
-        product_pricelist_item = self.env["product.pricelist.item"]
+        product_pricelist_item_model = self.env[
+            "product.pricelist.item"
+        ]  # type: PriceListItem
         query = (
             "SELECT id FROM product_pricelist_item"
             + " WHERE active AND min_quantity = 0 AND compute_price = 'fixed'"
@@ -25,10 +30,10 @@ class ProductService(models.AbstractModel):
             target_datetime,  # date_start
             target_datetime,  # date_end
         )
-        product_pricelist_item.env.cr.execute(query, params)
-        pricelist_item = product_pricelist_item.env.cr.fetchone()
+        product_pricelist_item_model.env.cr.execute(query, params)
+        pricelist_item = product_pricelist_item_model.env.cr.fetchone()
         if pricelist_item:
-            pricelist_item = product_pricelist_item.browse(pricelist_item[0])
+            pricelist_item = product_pricelist_item_model.browse(pricelist_item[0])
             sales_price = pricelist_item.fixed_price
             sales_currency = pricelist_item.currency_id.name
             sales_date_start = pricelist_item.date_start
@@ -37,7 +42,7 @@ class ProductService(models.AbstractModel):
             sales_currency = None
             sales_date_start = None
 
-        return AidPriceDict(
+        return AidPriceData(
             price=sales_price,
             currency=sales_currency,
             date_start=sales_date_start,
@@ -46,7 +51,9 @@ class ProductService(models.AbstractModel):
 
     def _get_purchase_price(self, product_tmpl_id, product_id, target_date):
 
-        product_supplierinfo = self.env["product.supplierinfo"]
+        product_supplierinfo_model = self.env[
+            "product.supplierinfo"
+        ]  # type: SupplierInfo
         query = (
             "SELECT id FROM product_supplierinfo"
             + " WHERE min_qty = 0"
@@ -62,10 +69,10 @@ class ProductService(models.AbstractModel):
             target_date,  # date_start
             target_date,  # date_end
         )
-        product_supplierinfo.env.cr.execute(query, params)
-        supplierinfo = product_supplierinfo.env.cr.fetchone()
+        product_supplierinfo_model.env.cr.execute(query, params)
+        supplierinfo = product_supplierinfo_model.env.cr.fetchone()
         if supplierinfo:
-            supplierinfo = product_supplierinfo.browse(supplierinfo[0])
+            supplierinfo = product_supplierinfo_model.browse(supplierinfo[0]) # type: SupplierInfo
             purchase_price = supplierinfo.price
             purchase_currency = supplierinfo.currency_id.name
             purchase_date_start = supplierinfo.date_start
@@ -74,7 +81,7 @@ class ProductService(models.AbstractModel):
             purchase_currency = None
             purchase_date_start = None
 
-        return AidPriceDict(
+        return AidPriceData(
             price=purchase_price,
             currency=purchase_currency,
             date_start=purchase_date_start,
@@ -82,13 +89,14 @@ class ProductService(models.AbstractModel):
         )
 
     def _get_tais_price_cap(self, tais_code, target_date):
-        
-        priceListService = self.env["taisplus.pricelist.service"]
-        taisPriceCap = priceListService.get_tais_price_cap(
+
+        price_list_service_model = self.env[
+            "taisplus.pricelist.service"
+        ]  # type: PriceListService
+        taisPriceCap = price_list_service_model.get_tais_price_cap(
             tais_code, target_date
         )
         return taisPriceCap
-
 
     def get_tais_product(
         self, default_code: str, target_datetime: datetime, target_date: date
@@ -118,11 +126,9 @@ class ProductService(models.AbstractModel):
         )
 
         # TAIS pricecap
-        taisPriceCap = self._get_tais_price_cap(
-            product.tais_code, target_date
-        )
+        taisPriceCap = self._get_tais_price_cap(product.tais_code, target_date)
 
-        return AidProductDict(
+        return AidProductData(
             default_code=default_code,
             product_name=product.name if product else None,
             sales_price=sales_price,

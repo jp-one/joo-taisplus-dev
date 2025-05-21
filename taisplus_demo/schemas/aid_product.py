@@ -1,16 +1,19 @@
-from typing import Any, TypedDict
+from dataclasses import dataclass
+from typing import Any
 
 
-class AidPriceDict(TypedDict):
+@dataclass
+class AidPriceData:
     price: float
     currency: str
     date_start: str
     target_datetime: str
 
 
-class AidProductDict(TypedDict):
+@dataclass
+class AidProductData:
     default_code: str
     product_name: str
-    sales_price: AidPriceDict
-    purchase_price: AidPriceDict
-    tais_pricecap: Any  # TaisPriceCapDict
+    sales_price: AidPriceData
+    purchase_price: AidPriceData
+    tais_pricecap: Any # TaisPriceCapData

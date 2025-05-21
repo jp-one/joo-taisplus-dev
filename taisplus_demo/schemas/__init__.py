@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 
-from .aid_product import AidPriceDict, AidProductDict
+from .aid_product import AidPriceData, AidProductData
