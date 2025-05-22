@@ -74,7 +74,7 @@ class Tais(models.Model):
     image = fields.Binary(string="Image", compute="_compute_image_url")
     product_summary = fields.Text(string="製品概要")
     is_discontinued = fields.Boolean(string="生産終了", default=False)
-    
+
     pricelist_item_ids = fields.One2many(
         comodel_name="taisplus.pricelist.item",
         inverse_name="id",
@@ -83,14 +83,14 @@ class Tais(models.Model):
         store=False,
     )
 
-    @api.depends("pricelist_item_ids")
-    def _compute_pricelist_item_ids(self):
-        for record in self:
-            items = self.env["taisplus.pricelist.item"].search([
-                ("tais_code", "=", record.tais_code)
-            ])
-            record.pricelist_item_ids = items
-    
+    related_product_ids = fields.One2many(
+        comodel_name="product.product",
+        inverse_name="id",
+        string="関連商品",
+        compute="_compute_related_product_ids",
+        store=False,
+    )
+
     @api.depends("image_url")
     def _compute_image_url(self):
         for record in self:
@@ -104,6 +104,22 @@ class Tais(models.Model):
                     _logger.error(
                         f"Failed to fetch image from URL {record.image_url}: {e}"
                     )
+
+    @api.depends("pricelist_item_ids")
+    def _compute_pricelist_item_ids(self):
+        for record in self:
+            items = self.env["taisplus.pricelist.item"].search(
+                [("tais_code", "=", record.tais_code)]
+            )
+            record.pricelist_item_ids = items
+
+    @api.depends("related_product_ids")
+    def _compute_related_product_ids(self):
+        for record in self:
+            products = self.env["product.product"].search(
+                [("tais_code", "=", record.tais_code)]
+            )
+            record.related_product_ids = products
 
     def name_get(self):
         return [(record.id, f"[{record.tais_code}] {record.name}") for record in self]
