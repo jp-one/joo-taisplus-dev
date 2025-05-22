@@ -1,6 +1,6 @@
 <odoo>
     <record id="tais_tree" model="ir.ui.view">
-        <field name="name">taisplus tais tree</field>
+        <field name="name">taisplus.tais.tree</field>
         <field name="model">taisplus.tais</field>
         <field name="arch" type="xml">
             <tree string="TAISコード" decoration-warning="is_discontinued">
@@ -17,7 +17,7 @@
     </record>
 
     <record id="tais_form" model="ir.ui.view">
-        <field name="name">taisplus tais form</field>
+        <field name="name">taisplus.tais.form</field>
         <field name="model">taisplus.tais</field>
         <field name="arch" type="xml">
             <form string="TAISコード" default_order="tais_code asc">
@@ -36,6 +36,24 @@
                         <field name="tais_url" widget="url"/>
                         <field name="is_discontinued" />
                     </group>
+                    <notebook>
+                        <page string="貸与価格">
+                            <field name="pricelist_item_ids">
+                                <tree default_order="tais_code_date desc">
+                                    <field name="tais_code_date"/>
+                                    <field name="average_price"/>
+                                    <field name="price_cap"/>
+                                </tree>
+                                <!-- <form>
+                                    <group>
+                                        <field name="tais_code_date"/>
+                                        <field name="average_price"/>
+                                        <field name="price_cap"/>
+                                    </group>
+                                </form> -->
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -43,7 +61,7 @@
 
     <!-- 検索ビュー -->
     <record id="tais_search_view" model="ir.ui.view">
-        <field name="name">taisplus tais search view</field>
+        <field name="name">taisplus.tais.search.view</field>
         <field name="model">taisplus.tais</field>
         <field name="arch" type="xml">
             <search>

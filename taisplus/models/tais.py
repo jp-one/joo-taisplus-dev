@@ -74,7 +74,23 @@ class Tais(models.Model):
     image = fields.Binary(string="Image", compute="_compute_image_url")
     product_summary = fields.Text(string="製品概要")
     is_discontinued = fields.Boolean(string="生産終了", default=False)
+    
+    pricelist_item_ids = fields.One2many(
+        comodel_name="taisplus.pricelist.item",
+        inverse_name="id",
+        string="価格リスト",
+        compute="_compute_pricelist_item_ids",
+        store=False,
+    )
 
+    @api.depends("pricelist_item_ids")
+    def _compute_pricelist_item_ids(self):
+        for record in self:
+            items = self.env["taisplus.pricelist.item"].search([
+                ("tais_code", "=", record.tais_code)
+            ])
+            record.pricelist_item_ids = items
+    
     @api.depends("image_url")
     def _compute_image_url(self):
         for record in self:
