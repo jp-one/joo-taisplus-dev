@@ -83,11 +83,11 @@ class Tais(models.Model):
         store=False,
     )
 
-    related_product_ids = fields.One2many(
-        comodel_name="product.product",
+    related_product_template_ids = fields.One2many(
+        comodel_name="product.template",
         inverse_name="id",
-        string="関連商品",
-        compute="_compute_related_product_ids",
+        string="関連プロダクト",
+        compute="_compute_related_product_template_ids",
         store=False,
     )
 
@@ -113,13 +113,15 @@ class Tais(models.Model):
             )
             record.pricelist_item_ids = items
 
-    @api.depends("related_product_ids")
-    def _compute_related_product_ids(self):
+    @api.depends("related_product_template_ids")
+    def _compute_related_product_template_ids(self):
         for record in self:
             products = self.env["product.product"].search(
                 [("tais_code", "=", record.tais_code)]
             )
-            record.related_product_ids = products
+            template_ids = products.mapped("product_tmpl_id").ids
+            templates = self.env["product.template"].browse(template_ids)
+            record.related_product_template_ids = templates
 
     def name_get(self):
         return [(record.id, f"[{record.tais_code}] {record.name}") for record in self]

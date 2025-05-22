@@ -54,7 +54,7 @@
                             </field>
                         </page>
                         <page string="関連プロダクト">
-                            <field name="related_product_ids"/>
+                            <field name="related_product_template_ids"/>
                         </page>
                     </notebook>
                 </sheet>
