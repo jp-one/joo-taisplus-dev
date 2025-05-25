@@ -1,8 +1,17 @@
-from odoo import models
+from dataclasses import asdict
+import json
+from odoo import api, models
 from datetime import date
 from typing import Optional
 from ..schemas.tais_pricecap import TaisPriceCapData, TaisPriceCapItemData
 from .pricelist_item import PriceListItem
+
+
+def date_serializer(obj):
+    """Custom serializer for date objects."""
+    if isinstance(obj, date):
+        return obj.isoformat()
+    return obj  # Return the object as-is if it's not serializable
 
 
 class PriceListService(models.AbstractModel):
@@ -61,3 +70,8 @@ class PriceListService(models.AbstractModel):
         if not target:
             return future
         return future if target.price_cap > future.price_cap else target
+
+    @api.model
+    def get_tais_price_cap_json(self, tais_code: str, target_date: date):
+        taisPriceCapData = self.get_tais_price_cap(tais_code, target_date)
+        return json.dumps(asdict(taisPriceCapData), default=date_serializer)

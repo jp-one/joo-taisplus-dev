@@ -1,4 +1,10 @@
-from odoo import models
+from dataclasses import asdict
+import json
+
+import pytz
+
+from pytz import utc
+from odoo import api, models
 from datetime import date, datetime
 from ..schemas import AidPriceData, AidVenderPriceData, AidProductData
 
@@ -7,11 +13,19 @@ from ..schemas import AidPriceData, AidVenderPriceData, AidProductData
 # from addons.product.models.product_supplierinfo import SupplierInfo
 
 
+def date_serializer(obj):
+    """Custom serializer for date objects."""
+    if isinstance(obj, date):
+        return obj.isoformat()
+    return obj  # Return the object as-is if it's not serializable
+
 class ProductService(models.AbstractModel):
     _name = "product_tais.product.service"
     _description = "Product Service"
 
-    def _get_sales_price(self, product_tmpl_id, product_id, target_datetime):
+    def _get_sales_price(
+        self, product_tmpl_id: int, product_id: int, target_datetime: datetime
+    ):
 
         product_pricelist_item_model = self.env[
             "product.pricelist.item"
@@ -41,21 +55,25 @@ class ProductService(models.AbstractModel):
                     pricelist_item.fixed_price if pricelist_item.fixed_price else None
                 ),
                 currency=pricelist_item.currency_id.name,
-                date_start=(
+                datetime_start=(
                     pricelist_item.date_start if pricelist_item.date_start else None
                 ),
-                date_end=pricelist_item.date_end if pricelist_item.date_end else None,
+                datetime_end=(
+                    pricelist_item.date_end if pricelist_item.date_end else None
+                ),
             )
 
         return AidPriceData(
             target_datetime=target_datetime,
             price=None,
             currency=None,
-            date_start=None,
-            date_end=None,
+            datetime_start=None,
+            datetime_end=None,
         )
 
-    def _get_purchase_price(self, product_tmpl_id, product_id, target_date):
+    def _get_purchase_price(
+        self, product_tmpl_id: int, product_id: int, target_date: date
+    ):
 
         product_supplierinfo_model = self.env[
             "product.supplierinfo"
@@ -82,11 +100,11 @@ class ProductService(models.AbstractModel):
                 supplierinfo[0]
             )  # type: SupplierInfo
             return AidVenderPriceData(
-                target_datetime=target_date,
-                date_start=supplierinfo.date_start if supplierinfo.date_start else None,
-                date_end=supplierinfo.date_end if supplierinfo.date_end else None,
+                target_date=target_date,
                 price=supplierinfo.price,
                 currency=supplierinfo.currency_id.name,
+                date_start=supplierinfo.date_start if supplierinfo.date_start else None,
+                date_end=supplierinfo.date_end if supplierinfo.date_end else None,
                 vendor_name=(
                     supplierinfo.partner_id.name
                     if supplierinfo.partner_id.name
@@ -101,7 +119,7 @@ class ProductService(models.AbstractModel):
             )
 
         return AidVenderPriceData(
-            target_datetime=target_date,
+            target_date=target_date,
             price=None,
             currency=None,
             date_start=None,
@@ -111,7 +129,7 @@ class ProductService(models.AbstractModel):
             vendor_product_name=None,
         )
 
-    def _get_tais_price_cap(self, tais_code, target_date):
+    def _get_tais_price_cap(self, tais_code: str, target_date: date):
 
         price_list_service_model = self.env[
             "taisplus.pricelist.service"
@@ -121,10 +139,10 @@ class ProductService(models.AbstractModel):
         )
         return taisPriceCap
 
+    @api.model
     def get_tais_product(
         self, default_code: str, target_datetime: datetime, target_date: date
     ):
-
         # default_code (Internal Reference)
         product_product = self.env["product.product"]
         product = product_product.search(
@@ -136,7 +154,17 @@ class ProductService(models.AbstractModel):
         )
 
         if not product:
-            return None
+            return AidProductData(
+                default_code=default_code,
+                product_name=None,
+                sales_price=None,
+                purchase_price=None,
+                tais_pricecap=None,
+            )
+
+        # Get product name in user's language
+        user_lang = self.env.user.lang or "en_US"
+        product_name = product.with_context(lang=user_lang).name
 
         # Product price
         sales_price = self._get_sales_price(
@@ -153,8 +181,40 @@ class ProductService(models.AbstractModel):
 
         return AidProductData(
             default_code=default_code,
-            product_name=product.name if product else None,
+            product_name=product_name,
             sales_price=sales_price,
             purchase_price=purchase_price,
             tais_pricecap=taisPriceCap,
         )
+    
+    @api.model
+    def get_tais_product_json(
+        self, default_code: str, date_string: str
+    ):
+        """
+        Returns TAIS product information as a JSON string.
+
+        Args:
+            default_code (str): The internal reference code of the product.
+            date_string (str): The target date and time in ISO format (e.g., '2024-05-25T12:00:00').
+                You can also specify only the date (e.g., '2024-05-25'). In this case, the time will be set to 00:00:00.
+
+        Returns:
+            str: A JSON string containing product details, sales price, purchase price, and TAIS price cap.
+
+        Raises:
+            ValueError: If the product with the given default_code is not found.
+
+        The method converts the input date string to the user's timezone, retrieves product data,
+        and serializes it to JSON, handling date objects appropriately.
+        """
+        dt = datetime.fromisoformat(date_string)
+        user_tzinfo = pytz.timezone(self.env.user.tz)
+        if dt.tzinfo is None:
+            dt_user = user_tzinfo.localize(dt)
+        else:
+            dt_user = dt.astimezone(user_tzinfo)
+        dt_date = dt_user.date()
+        dt_datetime = dt_user.astimezone(utc)
+        aidProductData = self.get_tais_product(default_code, dt_datetime, dt_date)
+        return json.dumps(asdict(aidProductData), default=date_serializer)

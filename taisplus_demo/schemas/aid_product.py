@@ -1,19 +1,24 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 
 @dataclass
 class AidPriceData:
-    target_datetime: date
+    target_datetime: datetime
+    price: float
+    currency: str
+    datetime_start: datetime
+    datetime_end: datetime
+
+
+@dataclass
+class AidVenderPriceData:
+    target_date: date
     price: float
     currency: str
     date_start: date
     date_end: date
-
-
-@dataclass
-class AidVenderPriceData(AidPriceData):
     vendor_name: str
     vendor_product_code: str
     vendor_product_name: str

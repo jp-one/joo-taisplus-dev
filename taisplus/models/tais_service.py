@@ -1,7 +1,10 @@
+from dataclasses import asdict
+import json
 import re
+from typing import Tuple, TypedDict, Union
 from bs4 import BeautifulSoup
 import requests
-from odoo import models
+from odoo import api, models
 from ..schemas.tais import TaisData
 
 
@@ -11,9 +14,19 @@ class TaisService(models.AbstractModel):
 
     _BASE_URL_TAIS = "https://www.techno-tais.jp/"
 
-    def generate_tais_url(self, tais_code1, tais_code2):
+    @api.model
+    def generate_tais_url(self, tais_code):
+        if not tais_code:
+            raise ValueError(
+                "TAIS code is required. Please provide it in the format '01234-012345'."
+            )
+        parts = tais_code.split("-")
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid TAIS code format: '{tais_code}'. Expected format is '01234-012345'."
+            )
         base_url = self._BASE_URL_TAIS + "ServiceWelfareGoodsDetail.php"
-        tais_url = f"{base_url}?RowNo=0&YouguCode1={tais_code1}&YouguCode2={tais_code2}"
+        tais_url = f"{base_url}?RowNo=0&YouguCode1={parts[0]}&YouguCode2={parts[1]}"
         return tais_url
 
     _name_to_code_rental = {
@@ -50,6 +63,7 @@ class TaisService(models.AbstractModel):
     def _get_sales_service_code(self, name):
         return self._name_to_code_sales.get(name, "00")
 
+    @api.model
     def fetch_tais_product_details(self, tais_url: str):
         # Access TAIS and parse HTML with BeautifulSoup
         response = requests.get(tais_url)
@@ -180,3 +194,25 @@ class TaisService(models.AbstractModel):
             image_url=image_url,
             is_discontinued=is_discontinued,
         )
+
+    @api.model
+    def fetch_tais_product_json(self, tais_code):
+        """
+        Retrieve product information for the specified TAIS code and return it as JSON.
+
+        :param tais_code: TAIS code in the format '01234-012345'
+        :return: JSON string of product information
+        :raises ValueError, RuntimeError
+        """
+        tais_url = self.generate_tais_url(tais_code)
+        try:
+            taisData = self.fetch_tais_product_details(tais_url)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to fetch TAIS product information: {e} (URL: {tais_url})"
+            )
+        if taisData.tais_code != tais_code:
+            raise ValueError(
+                f"TAIS code mismatch. Expected: '{tais_code}', got: '{taisData.tais_code}'."
+            )
+        return json.dumps(asdict(taisData))
